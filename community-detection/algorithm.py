@@ -2,35 +2,33 @@ import numpy as np
 from sklearn import linear_model
 from sklearn.cluster import k_means
 import math
-import queue
 from tqdm import tqdm
 import multiprocessing
+import numba
+import matplotlib.pyplot as plt
 
 
+@numba.jit(nopython=True)
 def find_geodesic_distances(graph, a):
     n = a.shape[0]
     _max = n + 10
-    # p = [[1 if a[i, j] == 1 else (0 if i == j else _max) for j in range(n)] for i in range(n)]
-    # for k in range(n):
-    #     for i in range(n):
-    #         for j in range(n):
-    #             p[i][j] = min(p[i][j], p[i][k] + p[k][j])
-    nodes = graph.nodes()
-    index = {nodes[i]: i for i in range(n)}
     p = [[_max for j in range(n)] for i in range(n)]
     for i in range(n):
         p[i][i] = 0
-        q = queue.Queue()
-        q.put((nodes[i], 0))
-        while not q.empty():
-            (v, c) = q.get()
-            for t in list(graph.adj[v]):
-                if p[i][index[t]] == _max:
-                    p[i][index[t]] = c + 1
-                    q.put((t, c + 1))
+        q = [(i, 0)]
+        start, end = 0, 1
+        while start < end:
+            (v, c) = q[start]
+            for t in graph[v]:
+                if p[i][t] == _max:
+                    p[i][t] = c + 1
+                    q.append((t, c + 1))
+                    end += 1
+            start += 1
     return np.array(p)
 
 
+@numba.jit(nopython=True)
 def find_score(p, sigma=10):
     n = p.shape[0]
     _max = n + 10
@@ -42,7 +40,7 @@ def find_score(p, sigma=10):
 def _find_symmetric_linear_coefficients_with_lasso(index, n, v, u):
     alpha = 1.0
     for i in range(10):
-        lasso = linear_model.Lasso(alpha=alpha, fit_intercept=False)
+        lasso = linear_model.Lasso(alpha=alpha, fit_intercept=False, precompute=True)
         lasso.fit(v, u)
         if sum(lasso.coef_) != 0:
             return lasso.coef_ / sum(lasso.coef_)
@@ -61,32 +59,35 @@ def _find_symmetric_linear_coefficients(s, n, index):
     return f
 
 
-def find_symmetric_linear_coefficients(s):
+def find_symmetric_linear_coefficients(s, job=0):
     n = s.shape[0]
     f = np.zeros([n, n])
-    # multiprocessing.freeze_support()
-    # number_process = 8
-    # pool = multiprocessing.Pool(processes=number_process - 1)
-    # per = int(n / number_process)
-    # result = []
-    # for i in range(number_process - 1):
-    #     index = [j for j in range(per * i, per * (i + 1))]
-    #     result.append(pool.apply_async(_find_symmetric_linear_coefficients, args=(s, n, index,)))
-    # pool.close()
-    # index = [j for j in range(per * (number_process - 1), n)]
-    # f[per * (number_process - 1):n, :] = f[per * (number_process - 1):n, :] + _find_symmetric_linear_coefficients(s, n,
-    #                                                                                                               index)
-    # pool.join()
-    #
-    # for i in range(number_process - 1):
-    #     p, q = per * i, per * (i + 1)
-    #     f[p:q, :] = f[p:q, :] + result[i].get()
-    for i in tqdm(range(n)):
-        u = s[:, i]
-        v = np.column_stack((s[:, :i], np.zeros([n, 1]), s[:, i + 1:]))
-        a = _find_symmetric_linear_coefficients_with_lasso(i, n, v, u)
-        a = a / max(a)
-        f[i, :] = f[i, :] + a
+    if job > 0:
+        multiprocessing.freeze_support()
+        number_process = job
+        pool = multiprocessing.Pool(processes=number_process - 1)
+        per = int(n / number_process)
+        result = []
+        for i in range(number_process - 1):
+            index = [j for j in range(per * i, per * (i + 1))]
+            result.append(pool.apply_async(_find_symmetric_linear_coefficients, args=(s, n, index,)))
+        pool.close()
+        index = [j for j in range(per * (number_process - 1), n)]
+        f[per * (number_process - 1):n, :] = f[per * (number_process - 1):n, :] + _find_symmetric_linear_coefficients(s,
+                                                                                                                      n,
+                                                                                                                      index)
+        pool.join()
+
+        for i in range(number_process - 1):
+            p, q = per * i, per * (i + 1)
+            f[p:q, :] = f[p:q, :] + result[i].get()
+    else:
+        for i in tqdm(range(n)):
+            u = s[:, i]
+            v = np.column_stack((s[:, :i], np.zeros([n, 1]), s[:, i + 1:]))
+            a = _find_symmetric_linear_coefficients_with_lasso(i, n, v, u)
+            a = a / max(a)
+            f[i, :] = f[i, :] + a
     f = (f + np.transpose(f)) / 2
     return f
 
@@ -104,14 +105,44 @@ def find_laplacian_matrix(d, f):
     return l
 
 
-def find_eigen_vectors(l, k=10):
+def _find_eigen_vectors(values, vectors, index, k=10):
+    return np.array([vectors.transpose()[index[i]] for i in range(k)]).transpose()
+
+
+def _find_vectors(l):
     values, vectors = np.linalg.eig(l)
-    _v = list(enumerate(values))
-    _v.sort(key=lambda element: element[1])
-    return np.array([vectors.transpose()[_v[i][0]] for i in range(k)]).transpose()
+    index = values.argsort()
+    return values, vectors, index
 
 
-def find_low_error_clusters(e, n_clusters):
+def find_low_error_clusters(ls, la, k=7, max_iter=1000, tol=1e-2):
+    x, y = [], []
+    k = min(k, ls.shape[0])
+    max_iter = min(max_iter, ls.shape[0])
+    es_values, es_vector, es_index = _find_vectors(ls)
+    ea_values, ea_vector, ea_index = _find_vectors(la)
+    result = []
+    for n_clusters in range(2, max_iter + 1):
+        es = _find_eigen_vectors(es_values, es_vector, es_index, k=k)
+        ea = _find_eigen_vectors(ea_values, ea_vector, ea_index, k=k)
+        e = np.column_stack((ea[:, :], es[:, :]))
+        print(e.shape)
+        labels, accumulative_error = _find_clusters(e, n_clusters)
+        result.append(labels)
+        x.append(n_clusters)
+        y.append(accumulative_error)
+        if n_clusters >= 4 and abs(
+                (y[n_clusters - 4] - y[n_clusters - 3]) - (y[n_clusters - 3] - y[n_clusters - 2])) / y[0] < tol:
+            break
+    plt.plot(x, y)
+    plt.scatter(x, y)
+    plt.xticks(x)
+    plt.grid()
+    plt.show()
+    return result[len(result) - 3]
+
+
+def _find_clusters(e, n_clusters):
     centroid, labels, inertia, best_n_iter = k_means(e.real, n_clusters=n_clusters, return_n_iter=True)
     print(inertia ** 0.5 / n_clusters)
     return labels, inertia ** 0.5 / n_clusters

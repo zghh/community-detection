@@ -1,6 +1,8 @@
 from setuptools import setup, find_packages
 
 dep = [
+    "py2neo==4.3.0",
+    "numba==0.46.0",
     "tqdm==4.36.1",
     "matplotlib==3.1.2",
     "networkx==1.9.1",

@@ -1,4 +1,7 @@
 import networkx
+from numba import types
+from numba.typed import Dict
+import numpy as np
 
 
 def load_data():
@@ -15,7 +18,7 @@ def load_data():
                 graph.add_edge(i, j)
     graph.add_edge(2, 3)
     graph.add_edge(3, 2)
-    return graph, networkx.to_numpy_matrix(graph).A
+    return _get_graph(graph), networkx.to_numpy_matrix(graph).A
 
 
 def load_data_from_gml(file_name):
@@ -34,4 +37,21 @@ def load_data_from_gml(file_name):
 
     print(graph.number_of_nodes(), graph.number_of_edges())
     matrix = networkx.to_numpy_matrix(graph).A
-    return graph, matrix
+    return _get_graph(graph), matrix
+
+
+def _get_graph(graph):
+    n = graph.number_of_nodes()
+    nodes = graph.nodes()
+    index = {nodes[i]: i for i in range(n)}
+    r = {}
+    for node in nodes:
+        for t in list(graph.adj[node]):
+            if index[node] in r:
+                r[index[node]].append(index[t])
+            else:
+                r[index[node]] = [index[t]]
+    result = Dict.empty(key_type=types.intp, value_type=types.int32[:], )
+    for i in range(n):
+        result[i] = np.asarray(r[i])
+    return result

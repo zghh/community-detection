@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn import linear_model
 from sklearn.cluster import k_means
+from sklearn.metrics import normalized_mutual_info_score
 import math
 from tqdm import tqdm
 import multiprocessing
@@ -115,13 +116,13 @@ def _find_vectors(l):
     return values, vectors, index
 
 
-def find_low_error_clusters(ls, la, k=7, max_iter=1000, tol=1e-2):
+def find_low_error_clusters(real_labels, ls, la, k=7, max_iter=1000, tol=1e-2, file_name=None):
     x, y = [], []
     k = min(k, ls.shape[0])
     max_iter = min(max_iter, ls.shape[0])
     es_values, es_vector, es_index = _find_vectors(ls)
     ea_values, ea_vector, ea_index = _find_vectors(la)
-    result = []
+    result, nmi = [], []
     for n_clusters in range(2, max_iter + 1):
         es = _find_eigen_vectors(es_values, es_vector, es_index, k=k)
         ea = _find_eigen_vectors(ea_values, ea_vector, ea_index, k=k)
@@ -129,15 +130,21 @@ def find_low_error_clusters(ls, la, k=7, max_iter=1000, tol=1e-2):
         print(e.shape)
         labels, accumulative_error = _find_clusters(e, n_clusters)
         result.append(labels)
+        nmi.append(normalized_mutual_info_score(real_labels, labels))
         x.append(n_clusters)
         y.append(accumulative_error)
         if n_clusters >= 4 and abs(
                 (y[n_clusters - 4] - y[n_clusters - 3]) - (y[n_clusters - 3] - y[n_clusters - 2])) / y[0] < tol:
             break
-    plt.plot(x, y)
+    y = _normalization(y)
+    plt.plot(x, y, label='Accumulative Error')
     plt.scatter(x, y)
+    plt.plot(x, nmi, label='NMI')
     plt.xticks(x)
     plt.grid()
+    plt.title(file_name)
+    plt.legend()
+    plt.savefig('../result/' + file_name + '.png')
     plt.show()
     return result[len(result) - 3]
 
@@ -146,3 +153,11 @@ def _find_clusters(e, n_clusters):
     centroid, labels, inertia, best_n_iter = k_means(e.real, n_clusters=n_clusters, return_n_iter=True)
     print(inertia ** 0.5 / n_clusters)
     return labels, inertia ** 0.5 / n_clusters
+
+
+def _normalization(x):
+    _min = min(x)
+    _max = max(x)
+    for i in range(len(x)):
+        x[i] = (x[i] - _min) / (_max - _min)
+    return x

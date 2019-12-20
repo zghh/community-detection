@@ -18,11 +18,13 @@ def load_data():
                 graph.add_edge(i, j)
     graph.add_edge(2, 3)
     graph.add_edge(3, 2)
-    return _get_graph(graph), networkx.to_numpy_matrix(graph).A
+    return _get_graph(graph), networkx.to_numpy_matrix(graph).A, [0, 0, 0, 1, 1, 1]
 
 
 def load_data_from_gml(file_name):
-    if file_name == 'polblogs':
+    if file_name == 'karate':
+        graph = networkx.karate_club_graph()
+    elif file_name == 'polblogs':
         with open('../data/' + file_name + '.gml', 'r', encoding='utf-8') as file:
             graph = networkx.parse_gml(file.read().split('\n')[1:])
     else:
@@ -34,10 +36,16 @@ def load_data_from_gml(file_name):
             remove_nodes.append(i)
     for i in remove_nodes:
         graph.remove_node(i)
+    labels = []
+    for i in graph:
+        if file_name == 'karate':
+            labels.append(graph.node[i]['club'])
+        else:
+            labels.append(graph.node[i]['value'])
 
     print(graph.number_of_nodes(), graph.number_of_edges())
     matrix = networkx.to_numpy_matrix(graph).A
-    return _get_graph(graph), matrix
+    return _get_graph(graph), matrix, labels
 
 
 def _get_graph(graph):

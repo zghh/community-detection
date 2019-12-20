@@ -11,6 +11,7 @@ def _add_graph(graph, a, name, labels):
     n = a.shape[0]
     for i in range(n):
         node = Node(name, name='{:03d}'.format(i))
+        node.add_label(str(labels[i]))
         graph.create(node)
     for i in range(n):
         for j in range(i + 1, n):
@@ -19,9 +20,6 @@ def _add_graph(graph, a, name, labels):
                 node_j = graph.nodes.match(name, name='{:03d}'.format(j)).first()
                 relationship = Relationship(node_i, 'normal', node_j)
                 graph.create(relationship)
-                if labels[i] == labels[j]:
-                    relationship = Relationship(node_i, 'community {:d}'.format(labels[i]), node_j)
-                    graph.create(relationship)
 
 
 def add_graph(a, labels, name):

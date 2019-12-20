@@ -1,3 +1,15 @@
+<head>
+    <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+    <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            tex2jax: {
+            skipTags: ['script', 'noscript', 'style', 'textarea', 'pre'],
+            inlineMath: [['$','$']]
+            }
+        });
+    </script>
+</head>
+
 # community-detection
 
 ## 参数设置
@@ -8,6 +20,7 @@
 | polblogs | $1224,16718$ | $5$ | $1$ | $7$ | $10^{-2}$ | $2$ | $7$ |
 
 ##查询
+
 查询包含特定节点的社区（如要求返回所有包含`id`为`1` 的节点的社区）
 
     match (n) where n.name = '001'

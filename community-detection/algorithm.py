@@ -38,8 +38,7 @@ def find_score(p, sigma=10):
     return np.array(s)
 
 
-def _find_symmetric_linear_coefficients_with_lasso(index, n, v, u):
-    alpha = 1.0
+def _find_symmetric_linear_coefficients_with_lasso(alpha, index, n, v, u):
     for i in range(10):
         lasso = linear_model.Lasso(alpha=alpha, fit_intercept=False, precompute=True)
         lasso.fit(v, u)
@@ -49,18 +48,18 @@ def _find_symmetric_linear_coefficients_with_lasso(index, n, v, u):
     return np.array([1 if i == index else 0 for i in range(n)])
 
 
-def _find_symmetric_linear_coefficients(s, n, index):
+def _find_symmetric_linear_coefficients(s, n, index, alpha):
     f = np.zeros([len(index), n])
     for i in index:
         u = s[:, i]
         v = np.column_stack((s[:, :i], np.zeros([n, 1]), s[:, i + 1:]))
-        a = _find_symmetric_linear_coefficients_with_lasso(i, n, v, u)
+        a = _find_symmetric_linear_coefficients_with_lasso(alpha, i, n, v, u)
         a = a / max(a)
         f[i - index[0], :] = f[i - index[0], :] + a
     return f
 
 
-def find_symmetric_linear_coefficients(s, job=0):
+def find_symmetric_linear_coefficients(s, alpha=1.0, job=0):
     n = s.shape[0]
     f = np.zeros([n, n])
     if job > 0:
@@ -71,12 +70,13 @@ def find_symmetric_linear_coefficients(s, job=0):
         result = []
         for i in range(number_process - 1):
             index = [j for j in range(per * i, per * (i + 1))]
-            result.append(pool.apply_async(_find_symmetric_linear_coefficients, args=(s, n, index,)))
+            result.append(pool.apply_async(_find_symmetric_linear_coefficients, args=(s, n, index, alpha,)))
         pool.close()
         index = [j for j in range(per * (number_process - 1), n)]
         f[per * (number_process - 1):n, :] = f[per * (number_process - 1):n, :] + _find_symmetric_linear_coefficients(s,
                                                                                                                       n,
-                                                                                                                      index)
+                                                                                                                      index,
+                                                                                                                      alpha, )
         pool.join()
 
         for i in range(number_process - 1):
@@ -86,7 +86,7 @@ def find_symmetric_linear_coefficients(s, job=0):
         for i in tqdm(range(n)):
             u = s[:, i]
             v = np.column_stack((s[:, :i], np.zeros([n, 1]), s[:, i + 1:]))
-            a = _find_symmetric_linear_coefficients_with_lasso(i, n, v, u)
+            a = _find_symmetric_linear_coefficients_with_lasso(alpha, i, n, v, u)
             a = a / max(a)
             f[i, :] = f[i, :] + a
     f = (f + np.transpose(f)) / 2

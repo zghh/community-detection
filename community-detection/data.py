@@ -36,16 +36,25 @@ def load_data_from_gml(file_name):
             remove_nodes.append(i)
     for i in remove_nodes:
         graph.remove_node(i)
+    graph = _fix_graph(graph, file_name)
     labels = []
     for i in graph:
-        if file_name == 'karate':
-            labels.append(graph.node[i]['club'])
-        else:
-            labels.append(graph.node[i]['value'])
+        labels.append(graph.node[i]['value'])
 
     print(graph.number_of_nodes(), graph.number_of_edges())
     matrix = networkx.to_numpy_matrix(graph).A
     return _get_graph(graph), matrix, labels
+
+
+def _fix_graph(graph, file_name):
+    new_graph = networkx.Graph()
+    for i in graph:
+        new_graph.add_node(graph.node[i]['label'] if file_name == 'polblogs' else i,
+                           value=(graph.node[i]['club'] if file_name == 'karate' else graph.node[i]['value']))
+    for node in graph.nodes():
+        for t in list(graph.adj[node]):
+            new_graph.add_edge(node, t)
+    return new_graph
 
 
 def _get_graph(graph):

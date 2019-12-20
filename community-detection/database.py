@@ -9,16 +9,16 @@ def _connect():
 
 def _add_graph(graph, a, name, labels):
     n = a.shape[0]
+    nodes = []
     for i in range(n):
-        node = Node(name, name='{:03d}'.format(i))
-        node.add_label(str(labels[i]))
-        graph.create(node)
+        # node = Node(name, name='{:03d}'.format(i))
+        # node.add_label(str(labels[i]))
+        nodes.append(Node('{:s}_{:d}'.format(name, labels[i]), name='{:03d}'.format(i)))
+        graph.create(nodes[i])
     for i in range(n):
         for j in range(i + 1, n):
             if a[i, j] == 1:
-                node_i = graph.nodes.match(name, name='{:03d}'.format(i)).first()
-                node_j = graph.nodes.match(name, name='{:03d}'.format(j)).first()
-                relationship = Relationship(node_i, 'normal', node_j)
+                relationship = Relationship(nodes[i], 'normal', nodes[j])
                 graph.create(relationship)
 
 

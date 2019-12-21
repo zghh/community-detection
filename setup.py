@@ -5,7 +5,7 @@ dep = [
     "numba==0.46.0",
     "tqdm==4.36.1",
     "matplotlib==3.1.2",
-    "networkx==1.9.1",
+    "networkx==2.4",
     "scikit-learn==0.21.3",
     "scipy==1.3.1",
     "numpy==1.17.2",

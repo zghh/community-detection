@@ -1,6 +1,5 @@
 from settings import *
 from py2neo import Node, Relationship, Graph
-from data import load_data_from_gml
 
 
 def _connect():
@@ -11,8 +10,6 @@ def _add_graph(graph, a, name, labels):
     n = a.shape[0]
     nodes = []
     for i in range(n):
-        # node = Node(name, name='{:03d}'.format(i))
-        # node.add_label(str(labels[i]))
         nodes.append(Node('{:s}_{:d}'.format(name, labels[i]), name='{:03d}'.format(i)))
         graph.create(nodes[i])
     for i in range(n):

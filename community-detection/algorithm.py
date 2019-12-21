@@ -146,7 +146,7 @@ def find_low_error_clusters(real_labels, ls, la, k=7, max_iter=1000, tol=1e-2, f
     plt.legend()
     plt.savefig('../result/' + file_name + '.png')
     plt.show()
-    return result[len(result) - 3]
+    return result[len(result) - 3], nmi[len(nmi) - 3]
 
 
 def _find_clusters(e, n_clusters):

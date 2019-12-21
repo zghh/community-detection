@@ -54,3 +54,23 @@ def _get_graph(graph):
     for i in range(n):
         result[i] = np.asarray(r[i])
     return result
+
+
+def load_lrf_data(file_name, n=1000, average_degree=20, max_degree=50, min_community=30, max_community=100):
+    mu = float(file_name[4:])
+    graph = networkx.generators.community.LFR_benchmark_graph(n, 2.5, 2.5, mu, average_degree=average_degree,
+                                                              max_degree=max_degree,
+                                                              min_community=min_community, max_community=max_community)
+    communities = {frozenset(graph.nodes[v]['community']) for v in graph}
+    print(len(communities))
+    labels = []
+    for i in range(n):
+        t = 0
+        for s in communities:
+            t = t + 1
+            if i in s:
+                labels.append(t)
+                break
+    print(graph.number_of_nodes(), graph.number_of_edges())
+    matrix = networkx.to_numpy_matrix(graph).A
+    return _get_graph(graph), matrix, labels

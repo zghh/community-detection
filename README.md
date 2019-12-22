@@ -20,5 +20,5 @@
 查询特定规模的社区（如要求返回所有节点数量⼤于`100`的社区）
 
     match (n) with n.name as name, labels(n)[0] as label
-    with distinct label, COUNT(*) as `count` 
+    with distinct label, count(*) as `count` 
     match (n) where labels(n)[0] = label and `count` > 100 return distinct n
